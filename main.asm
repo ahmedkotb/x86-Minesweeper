@@ -4,6 +4,10 @@
 welcome_msg db 'welcome to minesweeper',13,10,'$'
 end_msg db 'press any key to exit',13,10,'$'
 bombs db ?         ;bombs number
+start_x dw 50
+start_y dw 50
+cell_width equ 30
+cell_height equ 30
 grid db 480 dup(0) ;max grid size 16 * 30
 .CODE
 print MACRO msg_address
@@ -119,8 +123,7 @@ start:
 	int 10h
 
 	print 	welcome_msg 
-	draw_grid 4,4,50,50,30,30
-	;print	end_msg
+	draw_grid 4,4,start_x,start_y,cell_width,cell_height
 
 	mov ah,1h		    ;wait for key input to terminate
 	int 21h
