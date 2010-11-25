@@ -125,8 +125,27 @@ start:
 	print 	welcome_msg 
 	draw_grid 4,4,start_x,start_y,cell_width,cell_height
 
+	;init mouse
+	mov ax,0
+	int 33h
+	mov ax,1
+	int 33h
+	mov bx,0
+mouseLoop:
+	mov ax,3
+	int 33h
+	cmp bx,2
+	je close
+	cmp bx,1
+	jne mouseLoop
+	draw_line_caller cx,dx,10,78,0
+	jmp mouseLoop
+
+
+close:
 	mov ah,1h		    ;wait for key input to terminate
 	int 21h
+	print 	end_msg 
 	mov ax,3                    ;return to dos mode
 	int 10h
 	mov  ah,4ch                 ;DOS terminate program function
