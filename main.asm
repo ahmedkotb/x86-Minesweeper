@@ -8,8 +8,11 @@ start_x dw 50
 start_y dw 50
 cell_width equ 30
 cell_height equ 30
+rows db 8
+cols db 8
 grid db 480 dup(0) ;max grid size 16 * 30
 .CODE
+
 print MACRO msg_address
 	push ax
 	push dx
@@ -19,6 +22,73 @@ print MACRO msg_address
 	pop ax
 	pop dx
 ENDM print
+
+;private macro used in other macros to expand given row and col to required index in grid
+;uses ax as temp register and expand result is stored in bx
+_expand MACRO row,col
+	mov ax,row
+	mul cols
+	add ax,col
+	mov bx,ax
+ENDM
+
+set_grid_view_opened MACRO row,col
+	push ax
+	push bx
+	_expand row,col
+	mov al,[bx + OFFSET grid]
+	;clear most significant half byte then set it to 2
+	and al,0Fh
+	or al,20h
+	mov [bx + OFFSET grid],al
+	pop bx
+	pop ax
+ENDM
+
+set_grid_view_closed MACRO row,col
+	push ax
+	push bx
+	_expand row,col
+	mov al,[bx + OFFSET grid]
+	and al,0Fh
+	mov [bx + OFFSET grid],al
+	pop bx
+	pop ax
+ENDM
+
+set_grid_view_flaged MACRO row,col
+	push ax
+	push bx
+	_expand row,col
+	mov al,[bx + OFFSET grid]
+	and al,0Fh
+	or al,10h
+	mov [bx + OFFSET grid],al
+	pop bx
+	pop ax
+ENDM
+
+;converts screen coordinates at cx and dx to rows and cols
+;cl will have col number and dl will have row number
+convert_coordinates MACRO
+	push ax  	;save ax value
+	push bx  	;save bx value
+	;get col number	
+	sub cx,start_x
+	mov ax,cx
+	mov bl,cell_width
+	div bl
+	mov cx,ax
+	;get row number	
+	sub dx,start_y
+	mov ax,dx
+	mov bl,cell_height
+	div bl
+	mov dx,ax
+	;restore ax,bx registers
+	pop bx
+	pop ax
+ENDM
 
 draw_line PROC
 	push bp
@@ -82,9 +152,11 @@ draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 	push cx
 	push dx
 	;logic
-	mov cx,rows
+	xor cx,cx
+	mov cl,rows
 	inc cx
-	mov ax,cols
+	xor ax,ax
+	mov al,cols
 	mov bx,startY
 	mov dl,cell_width
 	mul dl
@@ -94,12 +166,14 @@ draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 		add bx,cell_height
 		loop rows_loop
 		
-		mov cx,cols
-		inc cx
-		mov ax,rows
-		mov bx,startX
-		mov dl,cell_height
-		mul dl
+	xor cx,cx
+	mov cl,cols
+	inc cx
+	xor al,al
+	mov al,rows
+	mov bx,startX
+	mov dl,cell_height
+	mul dl
 		;ax contains the len of the line
 	cols_loop:
 		draw_line_caller bx,startY,ax,58,1
@@ -123,13 +197,15 @@ start:
 	int 10h
 
 	print 	welcome_msg 
-	draw_grid 4,4,start_x,start_y,cell_width,cell_height
+	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
 
 	;init mouse
 	mov ax,0
 	int 33h
+	;show mouse cursor
 	mov ax,1
 	int 33h
+
 	mov bx,0
 mouseLoop:
 	mov ax,3
@@ -138,9 +214,19 @@ mouseLoop:
 	je close
 	cmp bx,1
 	jne mouseLoop
-	draw_line_caller cx,dx,10,78,0
+	;draw_line_caller cx,dx,10,78,0
+	convert_coordinates
+	cmp dl,0
+	je close
+	set_grid_view_opened 0,5
+	;mov bl,[OFFSET grid]  ;; WHY IN HELL this is not equal to mov bx,grid ??!!! 
+	mov bx,OFFSET grid
+	mov bx,[bx+5]
+	cmp bl,20h
+	je close
 	jmp mouseLoop
 
+	print 	welcome_msg
 
 close:
 	mov ah,1h		    ;wait for key input to terminate
