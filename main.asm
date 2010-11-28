@@ -90,6 +90,7 @@ convert_coordinates MACRO
 	pop ax
 ENDM
 
+;parameters startX,startY,length,Color,Vertical?
 draw_line PROC
 	push bp
 	mov bp,sp
@@ -135,6 +136,7 @@ draw_line PROC
 		RET
 ENDP
 
+;macro used to ease the invoke the draw line method
 draw_line_caller MACRO startX,startY,len,color,vertical
 	push vertical
 	push color
@@ -144,6 +146,38 @@ draw_line_caller MACRO startX,startY,len,color,vertical
 	call draw_line
 	add sp,10
 ENDM draw_line_caller
+
+;parameters startX,startY,lenX,lenY,color
+;=========  [bp+4],[bp+6], 8 , 10  , 12
+draw_filled_box PROC
+	push bp
+	mov bp,sp
+	push ax
+	push cx
+	mov ax,[bp+6]
+	mov cx,[bp+10]
+
+	lines:
+		;draw_line_caller MACRO startX,startY,len,color,vertical
+		draw_line_caller [bp+4],ax,[bp+8],[bp+12],0
+		inc ax
+		loop lines
+
+	pop cx
+	pop ax
+	pop bp
+	RET
+ENDP
+
+draw_filled_box_caller MACRO startX,startY,lenX,lenY,color
+	push color
+	push lenY
+	push lenX
+	push startY
+	push startX
+	call draw_filled_box
+	add sp,10
+ENDM draw_filled_box_caller
 
 draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 	;save registers
@@ -198,6 +232,9 @@ start:
 
 	print 	welcome_msg 
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
+	
+	;draw a test box
+	draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
 
 	;init mouse
 	mov ax,0
@@ -237,3 +274,4 @@ close:
 	mov  ah,4ch                 ;DOS terminate program function
 	int  21h                    ;terminate the program
 End start
+
