@@ -11,7 +11,26 @@ cell_height equ 30
 rows db 8
 cols db 8
 grid db 480 dup(0) ;max grid size 16 * 30
+
+;the random variable state
+rand db 0
 .CODE
+
+gen_random MACRO
+	;rand = (5*rand+3) % 32
+	push ax
+	push bx
+	xor ax,ax
+	mov al,rand
+	mov bl,5
+	mul bl
+	add al,3
+	mov bl,32
+	div bl
+	mov rand,ah
+	pop bx
+	pop ax
+ENDM
 
 print MACRO msg_address
 	push ax
@@ -199,7 +218,7 @@ draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 		draw_line_caller startX,bx,ax,58,0
 		add bx,cell_height
 		loop rows_loop
-		
+
 	xor cx,cx
 	mov cl,cols
 	inc cx
@@ -243,6 +262,15 @@ start:
 	mov ax,1
 	int 33h
 
+	;init seed using current system time
+	mov ah,0
+	int 1Ah
+	mov rand,dh
+
+	gen_random
+	cmp rand,3
+	je close
+
 	mov bx,0
 mouseLoop:
 	mov ax,3
@@ -256,7 +284,7 @@ mouseLoop:
 	cmp dl,0
 	je close
 	set_grid_view_opened 0,5
-	;mov bl,[OFFSET grid]  ;; WHY IN HELL this is not equal to mov bx,grid ??!!! 
+	;mov bl,[OFFSET grid]  ;; WHY IN HELL this is not equal to mov bx,grid ??!!!
 	mov bx,OFFSET grid
 	mov bx,[bx+5]
 	cmp bl,20h
