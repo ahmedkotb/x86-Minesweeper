@@ -38,8 +38,8 @@ print MACRO msg_address
 	mov dx,OFFSET msg_address
 	mov ah,9
 	int 21h
-	pop ax
 	pop dx
+	pop ax
 ENDM print
 
 ;private macro used in other macros to expand given row and col to required index in grid
