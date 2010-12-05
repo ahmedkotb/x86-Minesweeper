@@ -16,7 +16,11 @@ grid db 480 dup(0) ;max grid size 16 * 30
 ;the most significant half byte contains the view
 ;the second half byte contains the number
 ;the view can be either 0==>closed , 1==>flaged , 2==>opened
-;the data can be either -1==>bomb or range(0 to 8)
+;the data can be either -1==>bomb or number with range(0 to 8)
+;cell view constants
+CELL_CLOSED equ 0
+CELL_FLAGED equ 1
+CELL_OPENED equ 2
 
 ;the random variable state
 rand db 0
@@ -55,6 +59,23 @@ _expand MACRO row,col
 	mul cols
 	add ax,col
 	mov bx,ax
+ENDM
+
+;gets the value of the cell view and puts it in the specified memory location 
+;note : register can be used as out (except ax,bx,cx) as they are used inside the macro
+get_cell_view MACRO row,col,value_out
+	push ax
+	push bx
+	push cx
+	_expand row,col
+	mov al,[bx + OFFSET grid]
+	and al,0F0h
+	mov cl,4
+	shr al,cl
+	mov value_out,al
+	pop cx
+	pop bx
+	pop ax
 ENDM
 
 set_cell_opened MACRO row,col
@@ -286,14 +307,12 @@ mouseLoop:
 	cmp bx,1
 	jne mouseLoop
 	;draw_line_caller cx,dx,10,78,0
-	convert_coordinates
-	cmp dl,0
-	je close
+	;convert_coordinates
+	;cmp dl,0
+	;je close
 	set_cell_opened 0,5
-	;mov bl,[OFFSET grid]  ;; WHY IN HELL this is not equal to mov bx,grid ??!!!
-	mov bx,OFFSET grid
-	mov bx,[bx+5]
-	cmp bl,20h
+	get_cell_view 0,5,dl
+	cmp dl,CELL_OPENED
 	je close
 	jmp mouseLoop
 
