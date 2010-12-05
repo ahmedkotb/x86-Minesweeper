@@ -10,7 +10,13 @@ cell_width equ 30
 cell_height equ 30
 rows db 8
 cols db 8
+
 grid db 480 dup(0) ;max grid size 16 * 30
+;grid array conventions
+;the most significant half byte contains the view
+;the second half byte contains the number
+;the view can be either 0==>closed , 1==>flaged , 2==>opened
+;the data can be either -1==>bomb or range(0 to 8)
 
 ;the random variable state
 rand db 0
@@ -51,7 +57,7 @@ _expand MACRO row,col
 	mov bx,ax
 ENDM
 
-set_grid_view_opened MACRO row,col
+set_cell_opened MACRO row,col
 	push ax
 	push bx
 	_expand row,col
@@ -64,7 +70,7 @@ set_grid_view_opened MACRO row,col
 	pop ax
 ENDM
 
-set_grid_view_closed MACRO row,col
+set_cell_closed MACRO row,col
 	push ax
 	push bx
 	_expand row,col
@@ -75,7 +81,7 @@ set_grid_view_closed MACRO row,col
 	pop ax
 ENDM
 
-set_grid_view_flaged MACRO row,col
+set_cell_flaged MACRO row,col
 	push ax
 	push bx
 	_expand row,col
@@ -283,7 +289,7 @@ mouseLoop:
 	convert_coordinates
 	cmp dl,0
 	je close
-	set_grid_view_opened 0,5
+	set_cell_opened 0,5
 	;mov bl,[OFFSET grid]  ;; WHY IN HELL this is not equal to mov bx,grid ??!!!
 	mov bx,OFFSET grid
 	mov bx,[bx+5]
