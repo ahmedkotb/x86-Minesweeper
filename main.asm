@@ -6,8 +6,8 @@ end_msg db 'press any key to exit',13,10,'$'
 bombs db ?         ;bombs number
 start_x dw 50
 start_y dw 50
-cell_width equ 30
-cell_height equ 30
+cell_width equ 32
+cell_height equ 32
 rows db 8
 cols db 8
 
@@ -619,7 +619,6 @@ print_cell_value MACRO row,col,value
 	pop bx
 ENDM
 
-
 ;draws a flag icon in the specified locations
 ;parameters xpos,ypos
 draw_flag_proc PROC
@@ -656,11 +655,72 @@ draw_flag_caller MACRO row,col
 	push dx
 	expand_coordinates row,col
 	;push parameters
-	inc dx
-	inc cx
 	push dx
 	push cx
 	call draw_flag_proc
+	add sp,4
+	pop dx
+	pop cx
+ENDM
+
+;draws a bomb icon in the specified locations
+;parameters xpos,ypos
+draw_bomb_proc PROC
+	push bp
+	mov bp,sp
+	push ax
+	push bx
+
+	mov cx,[bp+4]
+	mov dx,[bp+6]
+
+	mov ax,cell_width/7
+	mov bx,cell_height/7
+	;first slice
+	add cx,cell_width/7*3
+	add dx,cell_height/7
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;second slice
+	sub cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*3
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;third slice
+	sub cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*5
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;fourth slice
+	add cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*3
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;fifth slice
+	add cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP
+
+draw_bomb_caller MACRO row,col
+	push cx
+	push dx
+	expand_coordinates row,col
+	;push parameters
+	push dx
+	push cx
+	call draw_bomb_proc
 	add sp,4
 	pop dx
 	pop cx
@@ -682,12 +742,14 @@ start:
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
 	
 	;draw a test box
-	draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
+	;draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
 	;test print value
 	print_cell_value 1,2,3
 	;test draw flag
 	draw_flag_caller 2,4
 	draw_flag_caller 2,5
+	;test draw bomb
+	draw_bomb_caller 3,5
 
 	;init mouse
 	mov ax,0
