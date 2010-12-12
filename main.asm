@@ -6,8 +6,8 @@ end_msg db 'press any key to exit',13,10,'$'
 bombs db ?         ;bombs number
 start_x dw 50
 start_y dw 50
-cell_width equ 32
-cell_height equ 32
+cell_width equ 36
+cell_height equ 36
 rows db 8
 cols db 8
 
@@ -253,33 +253,35 @@ draw_line PROC
 	push cx
 	push dx
 	push di
+	push si
 	;function logic
 	mov al,[bp+10]    ;fourth parameter  (color)
-	mov bx,[bp+8]     ;third parameter  (length)
+	mov si,[bp+8]     ;third parameter  (length)
 	mov dx,[bp+6]     ;second parameter (startY)
 	mov cx,[bp+4]     ;first parameter (startX)
 	mov ah,0ch
 	mov di,[bp+12]    ;fifth parameter (0 = horizontal otherwise vertical)
+	mov bh,0
 	cmp di,0 
 	jnz vertical
 	
 	horizontal:
 		int 10h
 		inc cx 
-		dec bx
-		cmp bx,0
+		dec si
 		jnz horizontal
 		jmp done
 
 	vertical:
 		int 10h
 		inc dx 
-		dec bx
+		dec si
 		jnz vertical
 	done:
 		;clear local storage
 		;nothing to clear
 		;restore registers
+		pop si
 		pop di
 		pop dx
 		pop cx
