@@ -33,6 +33,9 @@ numMines db ? ;total number of mines in the current active grid
 ;;numMinesLeft dw ? ;number of mines left in the game
 rand_mod db 0
 
+dxAr db 0,0FFh,0FFh,0FFh,0,1,1,1
+dyAr db 0FFh,0FFh,0,1,1,1,0,0FFh
+
 .CODE
 
 gen_rand_mod MACRO limit
@@ -349,6 +352,24 @@ init_grid MACRO
 	push cx
 	push dx
 	
+	; init all cells to 0
+	mov cl,rows
+	dec cl
+	mov dl,0
+	
+	loop_on_rows:
+		mov ch,cols
+		dec ch
+		loop_on_cols:
+			_expand_proc_caller cl,ch
+			mov [bx + OFFSET grid],dl
+			dec ch
+			cmp ch,0
+		jge loop_on_cols
+		dec cl
+		cmp cl,0
+	jge loop_on_rows
+	
 	;initialize frame
 	mov dl,20h
 	mov ch,rows
@@ -379,8 +400,8 @@ init_grid MACRO
 		cmp cl,0
 	jge init_vertical_frame
 	
-	;;;;;; generate bombs and init cells
-;	gen_bombs
+	gen_bombs
+
 	;restore registers
 	pop dx
 	pop cx
@@ -391,6 +412,8 @@ gen_bombs MACRO
 	;save registers
 	push ax
 	push cx
+	push dx
+	push si
 	
 	mov cx,0
 	mov cl,numMines
@@ -403,16 +426,50 @@ gen_bombs MACRO
 		_expand_proc_caller al,ah
 		
 		; test that this cell doesn't already contain a bomb (duplicate randoms)
-		mov al,[bx + OFFSET grid]
-		cmp al,0F0h
+		mov ch,[bx + OFFSET grid]
+		cmp ch,0Fh
 		je gen_bomb_loop
 		
 		; put bomb into cell
-		mov al,0F0h
-		mov [bx + OFFSET grid],al
-	loop gen_bomb_loop
+		mov ch,0Fh
+		mov [bx + OFFSET grid],ch
+		
+		;increment surrounding cells
+		mov si,7
+		loop_on_dAr:
+			lea bx,dxAr
+			mov dl,[bx+si]
+			lea bx,dyAr
+			mov dh,[bx+si]
+			add dl,al
+			add dh,ah
 	
+			_expand_proc_caller dl,dh
+		
+			mov ch,[bx + OFFSET grid]
+			cmp ch,0Fh
+			jae no_increment ;cell either contains a bomb OR is border cell (on the frame)
+			inc ch
+			mov [bx + OFFSET grid],ch
+			
+		no_increment:
+			
+			dec si
+			cmp si,0
+		jge loop_on_dAr
+		
+		dec cl
+		cmp cl,0
+		jg cont_loop
+		jmp exit_loop
+		
+	cont_loop:
+	jmp gen_bomb_loop
+	
+exit_loop:
 	;restor registers
+	pop si
+	pop dx
 	pop cx
 	pop ax
 ENDM gen_bombs
