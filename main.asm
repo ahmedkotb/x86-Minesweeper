@@ -39,15 +39,18 @@ dyAr db 0FFh,0FFh,0,1,1,1,0,0FFh
 .CODE
 
 gen_rand_mod MACRO limit
-	;rand = gen_random, var_rand = rand % limit
 	gen_random
 	push ax
 	push bx
+	push cx
 	mov ax,0
 	mov al,rand
 	mov bl,limit
-	div bl
+	mul bl
+	mov cl,5
+	shr ax,cl
 	mov rand_mod,ah
+	pop cx
 	pop bx
 	pop ax
 ENDM
@@ -428,8 +431,10 @@ gen_bombs MACRO
 		; test that this cell doesn't already contain a bomb (duplicate randoms)
 		mov ch,[bx + OFFSET grid]
 		cmp ch,0Fh
-		je gen_bomb_loop
+		jne put_bomb
+		jmp gen_bomb_loop
 		
+	put_bomb:		
 		; put bomb into cell
 		mov ch,0Fh
 		mov [bx + OFFSET grid],ch
@@ -482,6 +487,9 @@ start:
 	;start vga
 	mov ax,12h
 	int 10h
+
+;init_grid
+;jmp close
 
 	print 	welcome_msg 
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
@@ -542,5 +550,6 @@ close:
 	mov  ah,4ch                 ;DOS terminate program function
 	int  21h                    ;terminate the program
 End start
+
 
 
