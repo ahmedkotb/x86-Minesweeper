@@ -620,6 +620,52 @@ print_cell_value MACRO row,col,value
 ENDM
 
 
+;draws a flag icon in the specified locations
+;parameters xpos,ypos
+draw_flag_proc PROC
+	push bp
+	mov bp,sp
+	push ax
+	push bx
+
+	mov cx,[bp+4]
+	mov dx,[bp+6]
+	;draw the flag pole
+	add cx,cell_width/12*3
+	add dx,cell_height/6
+	mov ax,cell_width/12
+	mov bx,cell_height/6*4
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;draw the flag itself
+	add cx,cell_width/12 ;add only increase in x
+	mov ax,cell_width/3  ;adjust flag width
+	mov bx,cell_height/6*2 ;adjust flag height
+
+	draw_filled_box_caller cx,dx,ax,bx,12
+
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP
+
+draw_flag_caller MACRO row,col
+	push cx
+	push dx
+	expand_coordinates row,col
+	;push parameters
+	inc dx
+	inc cx
+	push dx
+	push cx
+	call draw_flag_proc
+	add sp,4
+	pop dx
+	pop cx
+ENDM
+
 start:
 	;set DS to point to the data segment
 	mov	ax,@data
@@ -639,6 +685,9 @@ start:
 	draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
 	;test print value
 	print_cell_value 1,2,3
+	;test draw flag
+	draw_flag_caller 2,4
+	draw_flag_caller 2,5
 
 	;init mouse
 	mov ax,0
