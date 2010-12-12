@@ -6,8 +6,8 @@ end_msg db 'press any key to exit',13,10,'$'
 bombs db ?         ;bombs number
 start_x dw 50
 start_y dw 50
-cell_width equ 30
-cell_height equ 30
+cell_width equ 36
+cell_height equ 36
 rows db 8
 cols db 8
 
@@ -253,33 +253,35 @@ draw_line PROC
 	push cx
 	push dx
 	push di
+	push si
 	;function logic
 	mov al,[bp+10]    ;fourth parameter  (color)
-	mov bx,[bp+8]     ;third parameter  (length)
+	mov si,[bp+8]     ;third parameter  (length)
 	mov dx,[bp+6]     ;second parameter (startY)
 	mov cx,[bp+4]     ;first parameter (startX)
 	mov ah,0ch
 	mov di,[bp+12]    ;fifth parameter (0 = horizontal otherwise vertical)
+	mov bh,0
 	cmp di,0 
 	jnz vertical
 	
 	horizontal:
 		int 10h
 		inc cx 
-		dec bx
-		cmp bx,0
+		dec si
 		jnz horizontal
 		jmp done
 
 	vertical:
 		int 10h
 		inc dx 
-		dec bx
+		dec si
 		jnz vertical
 	done:
 		;clear local storage
 		;nothing to clear
 		;restore registers
+		pop si
 		pop di
 		pop dx
 		pop cx
@@ -601,10 +603,11 @@ led_finish:
 	RET
 ENDP
 
+;prints number specified by value in the location specified by row and col
 print_cell_value MACRO row,col,value
-	push ax
 	push bx
 	push dx
+	push cx
 	expand_coordinates row,col
 	;push parameters
 	mov bx,OFFSET led_array
@@ -613,9 +616,116 @@ print_cell_value MACRO row,col,value
 	push cx
 	call draw_led_value
 	add sp,6
+	pop cx
 	pop dx
 	pop bx
+ENDM
+
+;draws a flag icon in the specified locations
+;parameters xpos,ypos
+draw_flag_proc PROC
+	push bp
+	mov bp,sp
+	push ax
+	push bx
+
+	mov cx,[bp+4]
+	mov dx,[bp+6]
+	;draw the flag pole
+	add cx,cell_width/12*3
+	add dx,cell_height/6
+	mov ax,cell_width/12
+	mov bx,cell_height/6*4
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;draw the flag itself
+	add cx,cell_width/12 ;add only increase in x
+	mov ax,cell_width/3  ;adjust flag width
+	mov bx,cell_height/6*2 ;adjust flag height
+
+	draw_filled_box_caller cx,dx,ax,bx,12
+
+	pop bx
 	pop ax
+	pop bp
+	RET
+ENDP
+
+draw_flag_caller MACRO row,col
+	push cx
+	push dx
+	expand_coordinates row,col
+	;push parameters
+	push dx
+	push cx
+	call draw_flag_proc
+	add sp,4
+	pop dx
+	pop cx
+ENDM
+
+;draws a bomb icon in the specified locations
+;parameters xpos,ypos
+draw_bomb_proc PROC
+	push bp
+	mov bp,sp
+	push ax
+	push bx
+
+	mov cx,[bp+4]
+	mov dx,[bp+6]
+
+	mov ax,cell_width/7
+	mov bx,cell_height/7
+	;first slice
+	add cx,cell_width/7*3
+	add dx,cell_height/7
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;second slice
+	sub cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*3
+
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;third slice
+	sub cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*5
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;fourth slice
+	add cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7*3
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	;fifth slice
+	add cx,cell_width/7
+	add dx,cell_height/7
+	mov ax,cell_width/7
+	draw_filled_box_caller cx,dx,ax,bx,7
+
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP
+
+draw_bomb_caller MACRO row,col
+	push cx
+	push dx
+	expand_coordinates row,col
+	;push parameters
+	push dx
+	push cx
+	call draw_bomb_proc
+	add sp,4
+	pop dx
+	pop cx
 ENDM
 
 start:
@@ -634,9 +744,14 @@ start:
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
 	
 	;draw a test box
-	draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
+	;draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
 	;test print value
 	print_cell_value 1,2,3
+	;test draw flag
+	draw_flag_caller 2,4
+	draw_flag_caller 2,5
+	;test draw bomb
+	draw_bomb_caller 3,5
 
 	;init mouse
 	mov ax,0
