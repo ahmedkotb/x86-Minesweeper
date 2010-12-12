@@ -24,7 +24,30 @@ CELL_OPENED equ 2
 
 ;the random variable state
 rand db 0
+
+numSmall equ 10 ;number of mines for the small grid
+numMedium equ 40 ;number of mines for the medium grid
+numLarge equ 99 ;number of mines for the large grid
+
+numMines db ? ;total number of mines in the current active grid
+;;numMinesLeft dw ? ;number of mines left in the game
+rand_mod db 0
+
 .CODE
+
+gen_rand_mod MACRO limit
+	;rand = gen_random, var_rand = rand % limit
+	gen_random
+	push ax
+	push bx
+	mov ax,0
+	mov al,rand
+	mov bl,limit
+	div bl
+	mov rand_mod,ah
+	pop bx
+	pop ax
+ENDM
 
 gen_random MACRO
 	;rand = (5*rand+3) % 32
@@ -55,11 +78,64 @@ ENDM print
 ;private macro used in other macros to expand given row and col to required index in grid
 ;uses ax as temp register and expand result is stored in bx
 _expand MACRO row,col
-	mov ax,row
-	mul cols
-	add ax,col
+	;bx <- index = ((row+1)*(cols+2)) + (col+1)
+	push ax
+	push dx
+	
+	mov ax,0
+	mov al,row
+	inc al
+	mov bx,0
+	mov bl,cols
+	add bx,2
+	mul bx
+	mov bx,0
+	mov bl,col
+	inc bl
+	add ax,bx 
 	mov bx,ax
+	
+	pop dx
+	pop ax
 ENDM
+
+; two 1-byte args
+; result is returned in bx
+_expand_proc_caller MACRO row,col
+	;bx <- index = ((row+1)*(cols+2)) + (col+1)
+	mov bx,0
+	mov bl,col
+	push bx
+	mov bl,row
+	push bx
+	call _expand_proc
+	add sp,4
+ENDM
+
+_expand_proc PROC
+	;bx <- index = ((row+1)*(cols+2)) + (col+1)
+	push bp
+	mov bp,sp
+
+	push ax
+	push dx
+	
+	mov ax,[bp+4] ;first parameter
+	inc al
+	mov bx,0
+	mov bl,cols
+	add bx,2
+	mul bx
+	mov bx,[bp+6] ;second parameter
+	inc bl
+	add ax,bx 
+	mov bx,ax
+	
+	pop dx
+	pop ax
+	pop bp
+	RET
+ENDP
 
 ;gets the value of the cell view and puts it in the specified memory location 
 ;note : register can be used as out (except ax,bx,cx) as they are used inside the macro
@@ -267,6 +343,80 @@ draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 		pop ax
 ENDM draw_grid
 
+init_grid MACRO
+	;save registers
+	push ax
+	push cx
+	push dx
+	
+	;initialize frame
+	mov dl,20h
+	mov ch,rows
+	mov cl,cols
+	
+	init_horizontal_frame:
+		_expand_proc_caller 0FFh,cl
+		mov [bx + OFFSET grid],dl
+		
+		_expand_proc_caller ch,cl
+		mov [bx + OFFSET grid],dl
+		
+		dec cl
+		cmp cl,0FFh
+	jge init_horizontal_frame
+	
+	mov ch,cols
+	mov cl,rows
+	
+	init_vertical_frame:
+		_expand_proc_caller cl,0FFh
+		mov [bx + OFFSET grid],dl
+		
+		_expand_proc_caller cl,ch
+		mov [bx + OFFSET grid],dl
+		
+		dec cl
+		cmp cl,0
+	jge init_vertical_frame
+	
+	;;;;;; generate bombs and init cells
+;	gen_bombs
+	;restore registers
+	pop dx
+	pop cx
+	pop ax
+ENDM init_grid
+
+gen_bombs MACRO
+	;save registers
+	push ax
+	push cx
+	
+	mov cx,0
+	mov cl,numMines
+	gen_bomb_loop:
+		gen_rand_mod rows
+		mov al,rand_mod ;save row number in al
+		gen_rand_mod cols
+		mov ah,rand_mod ;save col number in ah
+		
+		_expand_proc_caller al,ah
+		
+		; test that this cell doesn't already contain a bomb (duplicate randoms)
+		mov al,[bx + OFFSET grid]
+		cmp al,0F0h
+		je gen_bomb_loop
+		
+		; put bomb into cell
+		mov al,0F0h
+		mov [bx + OFFSET grid],al
+	loop gen_bomb_loop
+	
+	;restor registers
+	pop cx
+	pop ax
+ENDM gen_bombs
+
 start:
 	;set DS to point to the data segment
 	mov	ax,@data
@@ -296,14 +446,22 @@ start:
 
 	gen_random
 	cmp rand,3
-	je close
-
+	;je close  ERROR: relative jump out of range
+	je jmpClose
+	jmp cont
+	
+jmpClose:
+	jmp close
+	
+cont:	
 	mov bx,0
+
 mouseLoop:
 	mov ax,3
 	int 33h
 	cmp bx,2
 	je close
+
 	cmp bx,1
 	jne mouseLoop
 	;draw_line_caller cx,dx,10,78,0
@@ -327,4 +485,5 @@ close:
 	mov  ah,4ch                 ;DOS terminate program function
 	int  21h                    ;terminate the program
 End start
+
 
