@@ -601,10 +601,11 @@ led_finish:
 	RET
 ENDP
 
+;prints number specified by value in the location specified by row and col
 print_cell_value MACRO row,col,value
-	push ax
 	push bx
 	push dx
+	push cx
 	expand_coordinates row,col
 	;push parameters
 	mov bx,OFFSET led_array
@@ -613,10 +614,11 @@ print_cell_value MACRO row,col,value
 	push cx
 	call draw_led_value
 	add sp,6
+	pop cx
 	pop dx
 	pop bx
-	pop ax
 ENDM
+
 
 start:
 	;set DS to point to the data segment
