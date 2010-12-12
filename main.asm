@@ -36,6 +36,8 @@ rand_mod db 0
 dxAr db 0,0FFh,0FFh,0FFh,0,1,1,1
 dyAr db 0FFh,0FFh,0,1,1,1,0,0FFh
 
+;7 segment LED Auxillary Array
+led_array db 44h,3dh,6dh,4eh,6bh,7bh,45h,7fh
 .CODE
 
 gen_rand_mod MACRO limit
@@ -212,6 +214,29 @@ convert_coordinates MACRO
 	mov ax,dx
 	mov bl,cell_height
 	div bl
+	mov dx,ax
+	;restore ax,bx registers
+	pop bx
+	pop ax
+ENDM
+
+;converts given row and col to thier real locations
+;the result is stored in cx and dx
+;cx will have cell x position and dx will have the cell y position
+expand_coordinates MACRO row,col
+	push ax  	;save ax value
+	push bx  	;save bx value
+	;get xpos
+	mov al,col
+	mov bl,cell_width
+	mul bl
+	add ax,start_x
+	mov cx,ax
+	;get ypos
+	mov al,row
+	mov bl,cell_height
+	mul bl
+	add ax,start_x
 	mov dx,ax
 	;restore ax,bx registers
 	pop bx
@@ -479,6 +504,120 @@ exit_loop:
 	pop ax
 ENDM gen_bombs
 
+;led value takes a number and draw corresponding lines from the 7seg map
+draw_led_value PROC
+	push bp
+	mov bp,sp
+
+	push ax
+	push bx
+	push cx
+	push dx
+
+	mov cx,[bp + 4] ;first parameter ==> xpos
+	mov dx,[bp + 6] ;second parameter ==> ypos
+	mov ax,[bp + 8] ;third parameter ==> num (only al will be used , ah will be ignored)
+
+	test al,1
+	jz seg_2
+
+	add cx,cell_width/3	;division is done in Assemble time
+	add dx,cell_height/6
+	mov bx,cell_width/3
+	draw_line_caller cx,dx,bx,13,0
+	
+seg_2:
+	shr al,1
+	test al,1
+	jz seg_3
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3
+	add dx,cell_height/6
+	mov bx,cell_height/6*2
+	draw_line_caller cx,dx,bx,13,1
+
+seg_3:
+	shr al,1
+	test al,1
+	jz seg_4
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3*2
+	add dx,cell_height/6
+	mov bx,cell_height/6*2
+	draw_line_caller cx,dx,bx,13,1
+	
+seg_4:
+	shr al,1
+	test al,1
+	jz seg_5
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3
+	add dx,cell_height/6*3
+	mov bx,cell_width/3
+	draw_line_caller cx,dx,bx,13,0
+
+seg_5:
+	shr al,1
+	test al,1
+	jz seg_6
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3
+	add dx,cell_height/6*3
+	mov bx,cell_height/3
+	draw_line_caller cx,dx,bx,13,1
+
+seg_6:
+	shr al,1
+	test al,1
+	jz seg_7
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3
+	add dx,cell_height/6*5
+	mov bx,cell_width/3
+	draw_line_caller cx,dx,bx,13,0
+
+seg_7:
+	shr al,1
+	test al,1
+	jz led_finish
+	mov cx,[bp + 4] 
+	mov dx,[bp + 6]
+	add cx,cell_width/3*2
+	add dx,cell_height/6*3
+	mov bx,cell_height/3
+	draw_line_caller cx,dx,bx,13,1
+
+led_finish:
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP
+
+print_cell_value MACRO row,col,value
+	push ax
+	push bx
+	push dx
+	expand_coordinates row,col
+	;push parameters
+	mov bx,OFFSET led_array
+	push [bx+value-1]
+	push dx
+	push cx
+	call draw_led_value
+	add sp,6
+	pop dx
+	pop bx
+	pop ax
+ENDM
+
 start:
 	;set DS to point to the data segment
 	mov	ax,@data
@@ -496,6 +635,8 @@ start:
 	
 	;draw a test box
 	draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
+	;test print value
+	print_cell_value 1,2,3
 
 	;init mouse
 	mov ax,0
