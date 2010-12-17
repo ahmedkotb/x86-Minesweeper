@@ -51,7 +51,7 @@ gen_rand_mod MACRO limit
 	mul bl
 	mov cl,5
 	shr ax,cl
-	mov rand_mod,ah
+	mov rand_mod,al
 	pop cx
 	pop bx
 	pop ax
@@ -165,7 +165,7 @@ ENDM
 set_cell_opened MACRO row,col
 	push ax
 	push bx
-	_expand row,col
+	_expand_proc_caller row,col
 	mov al,[bx + OFFSET grid]
 	;clear most significant half byte then set it to 2
 	and al,0Fh
@@ -506,6 +506,76 @@ exit_loop:
 	pop ax
 ENDM gen_bombs
 
+; this MACRO uses ax, so YOU CANNOT SEND THE PARAMETERS TO THIS MACRO IN AX
+; WARNING: THIS MACRO MUST BE PLACED BEFORE open_cell PROC, OR ELSE YOU'LL GET ERRORS CUZ IT'LL NEED MULTI-PASS ASSEMBLING
+; IMPORTANT: this macro will initially be called by the mouse click handler. the mouse click handler is responsible to check whether this cell 
+;			 is a bomb or outside the grid or ... . In other words, it will only call the macro if the clicked cell is closed
+open_cell_caller MACRO row,col
+	push ax
+	mov ax,0
+	mov al,col
+	push ax
+	mov al,row
+	push ax
+	call open_cell
+	add sp,4
+	pop ax
+ENDM open_cell_caller
+
+open_cell PROC
+	; save bp
+	push bp
+	mov bp,sp
+	; save registers
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+	
+	mov ax,[bp+4] ;first parameter (row)
+	mov dx,[bp+6] ;second parameter (col)
+	mov ah,dl ;(al,ah) = (row,col)
+	set_cell_opened al,ah
+	
+	_expand_proc_caller al,ah
+	mov cl,[bx + OFFSET grid]
+	and cl,0Fh
+	cmp cl,0 ;if cell is not "closed", then return
+	jnz ret_open_cell
+	
+	; open adjacent cells
+	mov si,7
+	dAr_loop:
+		lea bx,dxAr
+		mov dl,[bx+si]
+		lea bx,dyAr
+		mov dh,[bx+si]
+		add dl,al
+		add dh,ah
+		
+		_expand_proc_caller dl,dh
+		mov cl,[bx + OFFSET grid]
+		cmp cl,0Fh
+		jge continue
+		open_cell_caller dl,dh
+
+	continue:
+		dec si
+		cmp si,0
+	jge dAr_loop
+	
+ret_open_cell:
+	; restore registers
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP open_cell
+
 ;led value takes a number and draw corresponding lines from the 7seg map
 draw_led_value PROC
 	push bp
@@ -806,6 +876,3 @@ close:
 	mov  ah,4ch                 ;DOS terminate program function
 	int  21h                    ;terminate the program
 End start
-
-
-
