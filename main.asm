@@ -939,23 +939,23 @@ open_cell PROC
 	
 	mov ax,[bp+4] ;first parameter (row)
 	mov dx,[bp+6] ;second parameter (col)
-	show_cell_caller ax,dx
-	mov ah,dl ;(al,ah) = (row,col)
-
-	_expand_proc_caller al,ah
+	_expand_proc_caller al,dl
 
 	;if cell is not "closed" (open or flaged), then return
-	;mov cl,[bx + OFFSET grid]
-	;and cl,0F0h
-	;cmp ch,CELL_CLOSED
-	;jnz ret_open_cell
+	mov cl,[bx + OFFSET grid]
+	and cl,0F0h
+	cmp cl,CELL_CLOSED
+	jnz ret_open_cell
 	
+	show_cell_caller ax,dx
+
 	;if cell has value then return
 	mov cl,[bx + OFFSET grid]
 	and cl,0Fh
 	cmp cl,0
 	jne ret_open_cell
 
+	mov ah,dl ;(al,ah) = (row,col)
 	; open adjacent cells
 	mov si,7
 	dAr_loop:
@@ -1068,19 +1068,24 @@ game_loop:
 
 	;check right button
 	cmp bx,2
-	jne check_left_button
-		print right_button_clicked_msg
+	jne aux_jump
 		mov di,0fh
-		;convert_coordinates
-		;mov dh,cl
-		;get_cell_view_proc_caller dx,cx
-		;cmp al,CELL_FLAGED
-		;je cell_has_flag
-		;set_cell_flaged dl,dh
-		;draw_flag_caller dx,cx
-		;jmp check_left_button
-		;cell_has_flag:
-			;draw_bomb_caller dx,cx
+		convert_coordinates
+		mov dh,cl
+		get_cell_view_proc_caller dx,cx
+		cmp al,CELL_OPENED
+		je check_left_button
+		cmp al,CELL_FLAGED
+		je cell_has_flag
+		set_cell_flaged dl,dh
+		draw_flag_caller dx,cx
+		jmp check_left_button
+	aux_jump:
+		cmp bx,2
+		jne check_left_button
+		cell_has_flag:
+			color_cell_caller dx,cx,CLOSED_CELL_BACKGROUND_COLOR
+			set_cell_closed dl,dh
 	;check left button
 	check_left_button:
 	cmp bx,1
