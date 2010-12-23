@@ -11,11 +11,11 @@ right_button_clicked_msg db 'right mouse button clicked',13,10,'$'
 
 bombs db ?         ;bombs number
 start_x dw 50
-start_y dw 50
+start_y dw 70
 cell_width equ 36
 cell_height equ 36
-rows db 8
-cols db 8
+rows db 10
+cols db 10
 
 grid db 480 dup(0) ;max grid size 16 * 30
 ;grid array conventions
@@ -293,7 +293,7 @@ get_screen_coordinates PROC
 	mov ax,[bp+4]
 	mov bl,cell_height
 	mul bl
-	add ax,start_x
+	add ax,start_y
 	mov dx,ax
 	;restore reg
 	pop bx
@@ -572,76 +572,6 @@ exit_loop:
 	pop ax
 ENDM gen_bombs
 
-; this MACRO uses ax, so YOU CANNOT SEND THE PARAMETERS TO THIS MACRO IN AX
-; WARNING: THIS MACRO MUST BE PLACED BEFORE open_cell PROC, OR ELSE YOU'LL GET ERRORS CUZ IT'LL NEED MULTI-PASS ASSEMBLING
-; IMPORTANT: this macro will initially be called by the mouse click handler. the mouse click handler is responsible to check whether this cell 
-;			 is a bomb or outside the grid or ... . In other words, it will only call the macro if the clicked cell is closed
-open_cell_caller MACRO row,col
-	push ax
-	mov ax,0
-	mov al,col
-	push ax
-	mov al,row
-	push ax
-	call open_cell
-	add sp,4
-	pop ax
-ENDM open_cell_caller
-
-open_cell PROC
-	; save bp
-	push bp
-	mov bp,sp
-	; save registers
-	push ax
-	push bx
-	push cx
-	push dx
-	push si
-	
-	mov ax,[bp+4] ;first parameter (row)
-	mov dx,[bp+6] ;second parameter (col)
-	mov ah,dl ;(al,ah) = (row,col)
-	set_cell_opened al,ah
-	
-	_expand_proc_caller al,ah
-	mov cl,[bx + OFFSET grid]
-	and cl,0Fh
-	cmp cl,0 ;if cell is not "closed", then return
-	jnz ret_open_cell
-	
-	; open adjacent cells
-	mov si,7
-	dAr_loop:
-		lea bx,dxAr
-		mov dl,[bx+si]
-		lea bx,dyAr
-		mov dh,[bx+si]
-		add dl,al
-		add dh,ah
-		
-		_expand_proc_caller dl,dh
-		mov cl,[bx + OFFSET grid]
-		cmp cl,0Fh
-		jge continue
-		open_cell_caller dl,dh
-
-	continue:
-		dec si
-		cmp si,0
-	jge dAr_loop
-	
-ret_open_cell:
-	; restore registers
-	pop si
-	pop dx
-	pop cx
-	pop bx
-	pop ax
-	pop bp
-	RET
-ENDP open_cell
-
 ;led value takes a number and draw corresponding lines from the 7seg map
 draw_led_value PROC
 	push bp
@@ -741,10 +671,13 @@ ENDP
 
 ;prints number specified by value in the location specified by row and col
 print_cell_value MACRO row,col,value
+	LOCAL @@skip
 	push bx
 	push dx
 	push cx
 	push si
+	cmp value,0
+	je @@skip
 	;expand_coordinates row,col
 	get_screen_coordinates_caller row,col
 	;push parameters
@@ -755,6 +688,7 @@ print_cell_value MACRO row,col,value
 	push cx
 	call draw_led_value
 	add sp,6
+@@skip:
 	pop si
 	pop cx
 	pop dx
@@ -929,6 +863,85 @@ get_cell_view_proc_caller MACRO row,col
 	add sp,4
 ENDM
 
+
+; this MACRO uses ax, so YOU CANNOT SEND THE PARAMETERS TO THIS MACRO IN AX
+; WARNING: THIS MACRO MUST BE PLACED BEFORE open_cell PROC, OR ELSE YOU'LL GET ERRORS CUZ IT'LL NEED MULTI-PASS ASSEMBLING
+; IMPORTANT: this macro will initially be called by the mouse click handler. the mouse click handler is responsible to check whether this cell 
+;			 is a bomb or outside the grid or ... . In other words, it will only call the macro if the clicked cell is closed
+open_cell_caller MACRO row,col
+	push ax
+	mov ax,0
+	mov al,col
+	push ax
+	mov al,row
+	push ax
+	call open_cell
+	add sp,4
+	pop ax
+ENDM open_cell_caller
+
+open_cell PROC
+	; save bp
+	push bp
+	mov bp,sp
+	; save registers
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+	
+	mov ax,[bp+4] ;first parameter (row)
+	mov dx,[bp+6] ;second parameter (col)
+	show_cell_caller ax,dx
+	mov ah,dl ;(al,ah) = (row,col)
+
+	_expand_proc_caller al,ah
+
+	;if cell is not "closed" (open or flaged), then return
+	;mov cl,[bx + OFFSET grid]
+	;and cl,0F0h
+	;cmp ch,CELL_CLOSED
+	;jnz ret_open_cell
+	
+	;if cell has value then return
+	mov cl,[bx + OFFSET grid]
+	and cl,0Fh
+	cmp cl,0
+	jne ret_open_cell
+
+	; open adjacent cells
+	mov si,7
+	dAr_loop:
+		lea bx,dxAr
+		mov dl,[bx+si]
+		lea bx,dyAr
+		mov dh,[bx+si]
+		add dl,al
+		add dh,ah
+		
+		_expand_proc_caller dl,dh
+		mov cl,[bx + OFFSET grid]
+		cmp cl,0Fh
+		jge continue
+		open_cell_caller dl,dh
+
+	continue:
+		dec si
+		cmp si,0
+	jge dAr_loop
+	
+ret_open_cell:
+	; restore registers
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	RET
+ENDP open_cell
+
 start:
 	;set DS to point to the data segment
 	mov	ax,@data
@@ -980,7 +993,7 @@ loop_r:
 	mov bl,cols
 	dec bl
 	loop_c:
-		show_cell_caller ax,bx
+		;show_cell_caller ax,bx
 		dec bl
 		cmp bl,0ffh
 		jne loop_c
@@ -1019,7 +1032,9 @@ mouseLoop:
 	cmp bx,1
 	jne mouseLoop
 	mov di,0fh
-	print left_button_clicked_msg
+	;print left_button_clicked_msg
+	convert_coordinates
+	open_cell_caller dl,cl
 
 	;set_cell_opened 0,5
 	;get_cell_view 0,5,dl
