@@ -1051,12 +1051,20 @@ loop_r:
 	mov bx,0
 	;di represents mouse buttons status flag (1 when mouse button is down,0 when mouse button is up)
 	mov di,0
-mouseLoop:
+game_loop:
 	;delay_1sec
 	mov ax,3
 	int 33h
 	and di,bx
-	jnz mouseLoop
+	;user is holding in mouse
+	jnz game_loop
+
+	cmp bx,0
+	jz game_loop ;no mouse button is clicked
+
+	;hide mouse cursor
+	mov ax,2
+	int 33h
 
 	;check right button
 	cmp bx,2
@@ -1076,7 +1084,7 @@ mouseLoop:
 	;check left button
 	check_left_button:
 	cmp bx,1
-	jne mouseLoop
+	jne mouse_reset
 	mov di,0fh
 	;print left_button_clicked_msg
 	convert_coordinates
@@ -1086,7 +1094,11 @@ mouseLoop:
 	;get_cell_view 0,5,dl
 	;cmp dl,CELL_OPENED
 	;je close
-	jmp mouseLoop
+mouse_reset:
+	;show mouse cursor
+	mov ax,1
+	int 33h
+	jmp game_loop
 
 close:
 	mov ah,1h		    ;wait for key input to terminate
