@@ -44,6 +44,10 @@ dyAr db 0FFh,0FFh,0,1,1,1,0,0FFh
 
 ;7 segment LED Auxillary Array
 led_array db 44h,3dh,6dh,4eh,6bh,7bh,45h,7fh
+
+;colors constants
+CLOSED_CELL_BACKGROUND_COLOR equ 8
+OPENED_CELL_BACKGROUND_COLOR equ 0
 .CODE
 
 delay_1sec MACRO
@@ -400,6 +404,36 @@ draw_filled_box_caller MACRO startX,startY,lenX,lenY,color
 	add sp,10
 ENDM draw_filled_box_caller
 
+;colors the given cell
+;parameters row,col,color
+color_cell PROC
+	push bp
+	mov bp,sp
+
+	push cx
+	push dx
+
+	get_screen_coordinates_caller [bp+4],[bp+6]
+	;to make boarder lines appear (decrease area of inner boxes)
+	inc cx
+	inc dx
+
+	draw_filled_box_caller cx,dx,cell_width-1,cell_height-1,[bp+8]
+	pop dx
+	pop cx
+
+	pop bp
+	RET
+ENDP
+
+color_cell_caller MACRO row,col,color
+	push color
+	push col
+	push row
+	call color_cell
+	add sp,6
+ENDM
+
 draw_grid MACRO rows,cols,startX,startY,cell_width,cell_height
 	;save registers
 	push ax
@@ -459,6 +493,17 @@ init_grid MACRO
 		loop_on_cols:
 			_expand_proc_caller cl,ch
 			mov [bx + OFFSET grid],dl
+			;draw empty cells background
+			;----------------
+			push cx
+			push dx
+			mov dl,ch
+			xor dh,dh
+			xor ch,ch
+			color_cell_caller cx,dx,CLOSED_CELL_BACKGROUND_COLOR
+			pop dx
+			pop cx
+			;----------------
 			dec ch
 			cmp ch,0
 		jge loop_on_cols
@@ -811,6 +856,7 @@ show_cell PROC
 	mov bp,sp
 	push ax
 	push bx
+	color_cell_caller [bp+4],[bp+6],OPENED_CELL_BACKGROUND_COLOR
 	_expand_proc_caller [bp+4],[bp+6]
 	mov al,[bx + OFFSET grid]
 	;clear most significant half byte then set it to 2 (open)
