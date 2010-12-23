@@ -4,6 +4,8 @@
 ;messages
 welcome_msg db 'welcome to minesweeper',13,10,'$'
 end_msg db 'press any key to exit',13,10,'$'
+lose_msg db 'lossseeeeeer :) :)',13,10,'$'
+win_msg db 'winneeeeeeeeer :) ',13,10,'$'
 ;debug messages
 gen_complete_msg db 'grid generated',13,10,'$'
 left_button_clicked_msg db 'left mouse button clicked',13,10,'$'
@@ -44,6 +46,8 @@ dyAr db 0FFh,0FFh,0,1,1,1,0,0FFh
 
 ;7 segment LED Auxillary Array
 led_array db 44h,3dh,6dh,4eh,6bh,7bh,45h,7fh
+
+closed_cells_num db 0
 
 ;colors constants
 CLOSED_CELL_BACKGROUND_COLOR equ 8
@@ -482,6 +486,13 @@ init_grid MACRO
 	push cx
 	push dx
 	
+	;init open cells numbers to rows*cols
+	mov al,rows
+	mul cols
+	mov closed_cells_num,al
+	mov al,numMines
+	sub closed_cells_num,al
+	
 	; init all cells to 0
 	mov cl,rows
 	dec cl
@@ -867,8 +878,10 @@ show_cell PROC
 	jmp fin
 bmb:
 	draw_bomb_caller [bp+4],[bp+6]
+	;set the cell as opened
 fin:	or al,20h
 	mov [bx + OFFSET grid],al
+	dec closed_cells_num
 	pop bx
 	pop ax
 	pop bp
@@ -909,6 +922,28 @@ get_cell_view_proc_caller MACRO row,col
 	add sp,4
 ENDM
 
+;get the specified cell value
+;input row,col (2 bytes each)
+;returns result in al
+get_cell_value_proc PROC
+	push bp
+	mov bp,sp
+	push bx
+	_expand_proc_caller [bp+4],[bp+6]
+	mov bl,[bx + OFFSET grid]
+	and bl,0Fh
+	mov al,bl
+	pop bx
+	pop bp
+	RET
+ENDP
+
+get_cell_value_proc_caller MACRO row,col
+	push col
+	push row
+	call get_cell_value_proc
+	add sp,4
+ENDM
 
 ; this MACRO uses ax, so YOU CANNOT SEND THE PARAMETERS TO THIS MACRO IN AX
 ; WARNING: THIS MACRO MUST BE PLACED BEFORE open_cell PROC, OR ELSE YOU'LL GET ERRORS CUZ IT'LL NEED MULTI-PASS ASSEMBLING
@@ -1000,19 +1035,6 @@ start:
 
 	print 	welcome_msg 
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
-	
-	;draw a test box
-	;draw_filled_box_caller start_x,start_y,cell_width,cell_height,13
-	;test print value
-	;mov ax,1
-	;mov bx,2
-	;mov si,4
-	;print_cell_value ax,bx,si
-	;test draw flag
-	;draw_flag_caller 2,4
-	;draw_flag_caller 2,5
-	;test draw bomb
-	;draw_bomb_caller 3,5
 
 	;init mouse
 	mov ax,0
@@ -1056,7 +1078,7 @@ game_loop:
 	mov ax,3
 	int 33h
 	and di,bx
-	;user is holding in mouse
+	;user is holding the mouse
 	jnz game_loop
 
 	cmp bx,0
@@ -1088,24 +1110,42 @@ game_loop:
 			set_cell_closed dl,dh
 	;check left button
 	check_left_button:
-	cmp bx,1
-	jne mouse_reset
-	mov di,0fh
-	;print left_button_clicked_msg
-	convert_coordinates
-	open_cell_caller dl,cl
+		cmp bx,1
+		jne mouse_reset
+		mov di,0fh
+		convert_coordinates
+		open_cell_caller dl,cl
+		xor dh,dh
+		xor ch,ch
+		;if cell wasn't opened (flaged) skip checking for bomb
+		get_cell_view_proc_caller dx,cx
+		cmp al,CELL_OPENED
+		jne mouse_reset
+		;check bomb
+		get_cell_value_proc_caller dx,cx
+		cmp al,0fh ;bomb
+		je lose
+		;check win
+		cmp closed_cells_num,0
+		je win		
+	mouse_reset:
+		;show mouse cursor
+		mov ax,1
+		int 33h
+	jmp game_loop
 
-	;set_cell_opened 0,5
-	;get_cell_view 0,5,dl
-	;cmp dl,CELL_OPENED
-	;je close
-mouse_reset:
+lose:
+	print lose_msg
+	jmp close
+
+win:
+	print win_msg
+
+close:
 	;show mouse cursor
 	mov ax,1
 	int 33h
-	jmp game_loop
 
-close:
 	mov ah,1h		    ;wait for key input to terminate
 	int 21h
 	print 	end_msg 
