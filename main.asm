@@ -13,7 +13,7 @@ right_button_clicked_msg db 'right mouse button clicked',13,10,'$'
 
 bombs db ?         ;bombs number
 start_x dw 20 ;50
-start_y dw 50 ;70
+start_y dw 40 ;70
 cell_width equ 27 		;36,24,18
 cell_height equ 27		;36,24,18
 rows db 10
@@ -96,13 +96,15 @@ gen_rand_mod MACRO limit
 	push ax
 	push bx
 	push cx
+	push dx
 	mov ax,0
 	mov al,rand
 	mov bl,limit
 	mul bl
-	mov cl,5
+	mov cl,7
 	shr ax,cl
 	mov rand_mod,al
+	pop dx	
 	pop cx
 	pop bx
 	pop ax
@@ -116,8 +118,8 @@ gen_random MACRO
 	mov al,rand
 	mov bl,5
 	mul bl
-	add al,3
-	mov bl,32
+	add al,5
+	mov bl,128
 	div bl
 	mov rand,ah
 	pop bx
@@ -1248,7 +1250,7 @@ type_1:
 	
 type_2:
 	mov rows,16
-	mov cols,30
+	mov cols,16
 	mov numMines,numLarge
 	
 ret_choose_type:
