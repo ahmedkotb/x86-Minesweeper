@@ -4,20 +4,22 @@
 ;messages
 welcome_msg db 'welcome to minesweeper',13,10,'$'
 end_msg db 'press any key to exit',13,10,'$'
-lose_msg db 'lossseeeeeer :) :)',13,10,'$'
-win_msg db 'winneeeeeeeeer :) ',13,10,'$'
+lose_msg db 'You have lost! :) :)',13,10,'$'
+win_msg db 'You WIN! :) ',13,10,'$'
 ;debug messages
 gen_complete_msg db 'grid generated',13,10,'$'
 left_button_clicked_msg db 'left mouse button clicked',13,10,'$'
 right_button_clicked_msg db 'right mouse button clicked',13,10,'$'
 
 bombs db ?         ;bombs number
-start_x dw 50
-start_y dw 70
-cell_width equ 36
-cell_height equ 36
+start_x dw 20 ;50
+start_y dw 50 ;70
+cell_width equ 27 		;36,24,18
+cell_height equ 27		;36,24,18
 rows db 10
 cols db 10
+grid_type db 0 ;type = SMALL_GRID by default
+
 
 grid db 480 dup(0) ;max grid size 16 * 30
 ;grid array conventions
@@ -33,9 +35,14 @@ CELL_OPENED equ 2
 ;the random variable state
 rand db 0
 
+;grid type constants
+SMALL_GRID equ 0
+MEDIUM_GRID equ 1
+LARGE_GRID equ 2
+
 numSmall equ 10 ;number of mines for the small grid
-numMedium equ 40 ;number of mines for the medium grid
-numLarge equ 99 ;number of mines for the large grid
+numMedium equ 30;40 ;number of mines for the medium grid
+numLarge equ 40; 99 ;number of mines for the large grid
 
 numMines db 10 ;total number of mines in the current active grid
 ;;numMinesLeft dw ? ;number of mines left in the game
@@ -49,9 +56,15 @@ led_array db 44h,3dh,6dh,4eh,6bh,7bh,45h,7fh
 
 closed_cells_num db 0
 
+lose_flag db 0
+
 ;colors constants
 CLOSED_CELL_BACKGROUND_COLOR equ 8
 OPENED_CELL_BACKGROUND_COLOR equ 0
+
+invalid_input_msg db 'Invalid Entry!',10,13,'$'
+choose_type_msg db 'Choose Game Type:',10,13,'1) Easy',10,13,'2) Medium',10,13,'3) Hard',10,13,'$'
+
 .CODE
 
 delay_1sec MACRO
@@ -486,6 +499,31 @@ init_grid MACRO
 	push cx
 	push dx
 	
+	;check for grid_type
+;	cmp grid_type,0
+;	je small_type
+;	cmp grid_type,1
+;	je medium_type
+	;@else: it is large type
+	
+;large_type:
+;	mov rows,16
+;	mov cols,30
+;	mov numMines,numLarge
+;	jmp start_init
+
+;small_type:
+;	mov rows,9
+;	mov cols,9
+;	mov numMines,numSmall
+;	jmp start_init
+
+;medium_type:
+;	mov rows,16
+;	mov cols,16
+;	mov numMines,numMedium
+	
+start_init:
 	;init open cells numbers to rows*cols
 	mov al,rows
 	mul cols
@@ -888,6 +926,18 @@ fin:	or al,20h
 	RET
 ENDP
 
+show_cell_caller_byte MACRO row_b_dl,col_b_dh
+	push cx
+	push dx
+	mov cx,0
+	mov cl,row_b_dl
+	mov dx,0
+	mov dl,col_b_dh
+	show_cell_caller cx,dx
+	pop dx
+	pop cx
+ENDM
+
 show_cell_caller MACRO row,col
 	push col
 	push row
@@ -914,36 +964,6 @@ get_cell_view_proc PROC
 	pop bp
 	RET
 ENDP
-
-get_cell_view_proc_caller MACRO row,col
-	push col
-	push row
-	call get_cell_view_proc
-	add sp,4
-ENDM
-
-;get the specified cell value
-;input row,col (2 bytes each)
-;returns result in al
-get_cell_value_proc PROC
-	push bp
-	mov bp,sp
-	push bx
-	_expand_proc_caller [bp+4],[bp+6]
-	mov bl,[bx + OFFSET grid]
-	and bl,0Fh
-	mov al,bl
-	pop bx
-	pop bp
-	RET
-ENDP
-
-get_cell_value_proc_caller MACRO row,col
-	push col
-	push row
-	call get_cell_value_proc
-	add sp,4
-ENDM
 
 ; this MACRO uses ax, so YOU CANNOT SEND THE PARAMETERS TO THIS MACRO IN AX
 ; WARNING: THIS MACRO MUST BE PLACED BEFORE open_cell PROC, OR ELSE YOU'LL GET ERRORS CUZ IT'LL NEED MULTI-PASS ASSEMBLING
@@ -984,9 +1004,15 @@ open_cell PROC
 	
 	show_cell_caller ax,dx
 
+	
 	;if cell has value then return
 	mov cl,[bx + OFFSET grid]
 	and cl,0Fh
+	cmp cl,0Fh ;if cell contains a bom
+	jne check_not_empty
+	mov lose_flag,1
+	
+check_not_empty:
 	cmp cl,0
 	jne ret_open_cell
 
@@ -1023,18 +1049,236 @@ ret_open_cell:
 	RET
 ENDP open_cell
 
+get_cell_view_proc_caller MACRO row,col
+	push col
+	push row
+	call get_cell_view_proc
+	add sp,4
+ENDM
+
+;get the specified cell value
+;input row,col (2 bytes each)
+;returns result in al
+get_cell_value_proc PROC
+	push bp
+	mov bp,sp
+	push bx
+	_expand_proc_caller [bp+4],[bp+6]
+	mov bl,[bx + OFFSET grid]
+	and bl,0Fh
+	mov al,bl
+	pop bx
+	pop bp
+	RET
+ENDP
+
+get_cell_value_proc_caller MACRO row,col
+	push col
+	push row
+	call get_cell_value_proc
+	add sp,4
+ENDM
+
+helper_caller MACRO row_w,col_w
+	push col_w
+	push row_w
+	call helper
+	add sp,4
+ENDM helper_caller
+
+helper PROC
+	; save bp
+	push bp
+	mov bp,sp
+	
+	;save registers
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+	
+	mov cx,[bp+4] ;first parameter
+	mov bx,[bp+6] ;second parameter
+	mov ch,bl ;now cl has the row, and ch has the col
+	
+	mov di,0 ;di will count the number of flags around the cell
+	mov si,7
+	dAr_count_loop:
+		lea bx,dxAr
+		mov dl,[bx+si]
+		lea bx,dyAr
+		mov dh,[bx+si]
+		add dl,cl
+		add dh,ch
+
+		;put dl,dh in word pointer
+		push cx
+		push dx
+		mov cx,0
+		mov cl,dh
+		mov dh,0
+		get_cell_view_proc_caller dx,cx ;returns result in al
+		pop dx
+		pop cx
+		
+		cmp al,CELL_FLAGED
+		jne continue_count
+		inc di
+		
+	continue_count:
+		dec si
+		cmp si,0
+	jge dAr_count_loop
+
+	; check whether this is a valid or invalid help request
+	_expand_proc_caller cl,ch
+	mov ax,0
+	mov al,[bx + OFFSET grid]
+	and al,0Fh
+	cmp ax,di
+	je valid_help
+	jmp invalid_help
+	
+	; valid help
+valid_help:
+;print win_msg
+	mov ax,cx ;now al has the row and ah has the col
+	mov si,7
+	dAr_open_loop:
+		lea bx,dxAr
+		mov dl,[bx+si]
+		lea bx,dyAr
+		mov dh,[bx+si]
+		add dl,al
+		add dh,ah
+		
+;		_expand_proc_caller dl,dh
+;		mov cl,[bx + OFFSET grid]
+;		mov ch,cl
+;		and ch,0F0h
+;		cmp ch,0 ;if cell is open or flagged, then skip, else: open it
+;		jne continue_open
+
+		; open cell
+;		set_cell_opened dl,dh
+;		show_cell_caller_byte dl,dh
+;		mov ch,cl
+;		and ch,0Fh
+;		cmp ch,0Fh ;check if cell is a bomb
+;		jne continue_open
+		
+		;bombed_cell
+;		mov lose_flag,1
+;		jmp ret_helper
+
+		open_cell_caller dl,dh
+		
+	continue_open:
+		dec si
+		cmp si,0
+	jge dAr_open_loop
+	jmp ret_helper
+	
+invalid_help:
+	; peep
+;print lose_msg
+	mov ah,2
+	mov dl,7
+	int 21h
+	
+ret_helper:
+	;retrieve registers
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	
+	RET
+ENDP helper
+
+choose_type PROC
+	push ax
+	push dx
+
+	; clear the display
+	mov ax,03h
+	int 10h	
+
+	;Logic	
+	mov dh,19 ;set row
+	mov dl,0 ;set col
+	mov ah,2
+	int 10h ;set cursor
+
+PROMPT:
+	print choose_type_msg
+	mov ah,1
+	int 21h
+	dec al
+	sub al,'0'
+	mov grid_type,al
+	cmp al,0
+	je type_0
+	cmp al,1
+	je type_1
+	cmp al,2
+	je type_2
+	
+	mov dh,18 ;set row
+	mov dl,0 ;set col
+	mov ah,2
+	int 10h ;set cursor
+	print invalid_input_msg
+jmp PROMPT
+	
+type_0:
+	mov rows,9
+	mov cols,9
+	mov numMines,numSmall
+	jmp ret_choose_type
+	
+type_1:
+	mov rows,16
+	mov cols,16
+	mov numMines,numMedium
+	jmp ret_choose_type
+	
+type_2:
+	mov rows,16
+	mov cols,30
+	mov numMines,numLarge
+	
+ret_choose_type:
+	pop dx
+	pop ax
+	RET
+ENDP choose_type
+
 start:
 	;set DS to point to the data segment
 	mov	ax,@data
 	mov  	ds,ax                  
 
+	call choose_type
+	
 	;start vga
 	mov ax,12h
 	int 10h
 
 
 	print 	welcome_msg 
+	
+	;init seed using current system time
+	mov ah,0
+	int 1Ah
+	mov rand,dh
+	;initialize grid
+	init_grid
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
+	print gen_complete_msg
 
 	;init mouse
 	mov ax,0
@@ -1042,14 +1286,6 @@ start:
 	;show mouse cursor
 	mov ax,1
 	int 33h
-
-	;init seed using current system time
-	mov ah,0
-	int 1Ah
-	mov rand,dh
-	;initialize grid
-	init_grid
-	print gen_complete_msg
 
 	;debug code to uncover all cells
 	;--------------------------------
@@ -1074,6 +1310,18 @@ loop_r:
 	;di represents mouse buttons status flag (1 when mouse button is down,0 when mouse button is up)
 	mov di,0
 game_loop:
+	mov al,lose_flag
+	cmp al,1
+	jne check_win
+	jmp lose
+
+check_win:
+	; check for winning
+	cmp closed_cells_num,0	
+	jne no_lose
+	jmp win
+	
+no_lose:
 	;delay_1sec
 	mov ax,3
 	int 33h
@@ -1084,6 +1332,24 @@ game_loop:
 	cmp bx,0
 	jz game_loop ;no mouse button is clicked
 
+	; check if the click is within the grid or not
+	; cx has horizontal mouse positions, and dx has the vertical one
+	cmp cx,start_x
+	jl game_loop
+
+	cmp dx,start_y
+	jl game_loop
+
+	convert_coordinates ; dl has the row number, cl has the col number
+	; save the output of convert_coordinates in the stack
+	push cx
+	push dx
+	
+	cmp dl,rows
+	jge game_loop
+	cmp cl,cols
+	jge game_loop
+
 	;hide mouse cursor
 	mov ax,2
 	int 33h
@@ -1092,7 +1358,11 @@ game_loop:
 	cmp bx,2
 	jne aux_jump
 		mov di,0fh
-		convert_coordinates
+		;convert_coordinates //already called once above
+		;retrieve the output of previously called convert_coordinates
+		pop dx
+		pop cx
+		
 		mov dh,cl
 		get_cell_view_proc_caller dx,cx
 		cmp al,CELL_OPENED
@@ -1113,7 +1383,18 @@ game_loop:
 		cmp bx,1
 		jne mouse_reset
 		mov di,0fh
-		convert_coordinates
+		;convert_coordinates
+		;retrieve the output of previously called convert_coordinates
+		pop dx
+		pop cx
+
+get_cell_view_proc_caller dx,cx
+cmp al,CELL_OPENED
+jne call_open_cell
+helper_caller dx,cx
+jmp mouse_reset
+
+call_open_cell:
 		open_cell_caller dl,cl
 		xor dh,dh
 		xor ch,ch
@@ -1154,6 +1435,4 @@ close:
 	mov  ah,4ch                 ;DOS terminate program function
 	int  21h                    ;terminate the program
 End start
-
-
 
