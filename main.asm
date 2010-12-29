@@ -6,12 +6,7 @@ welcome_msg db 'welcome to minesweeper',13,10,'$'
 end_msg db 'press any key to exit',13,10,'$'
 lose_msg db 'You have lost! :) :)',13,10,'$'
 win_msg db 'You WIN! :) ',13,10,'$'
-;debug messages
-gen_complete_msg db 'grid generated',13,10,'$'
-left_button_clicked_msg db 'left mouse button clicked',13,10,'$'
-right_button_clicked_msg db 'right mouse button clicked',13,10,'$'
 
-bombs db ?         ;bombs number
 start_x dw 20 ;50
 start_y dw 40 ;70
 cell_width equ 27 		;36,24,18
@@ -45,7 +40,6 @@ numMedium equ 30;40 ;number of mines for the medium grid
 numLarge equ 40; 99 ;number of mines for the large grid
 
 numMines db 10 ;total number of mines in the current active grid
-;;numMinesLeft dw ? ;number of mines left in the game
 rand_mod db 0
 
 dxAr db 0,0FFh,0FFh,0FFh,0,1,1,1
@@ -1284,7 +1278,6 @@ start:
 	;initialize grid
 	init_grid
 	draw_grid rows,cols,start_x,start_y,cell_width,cell_height
-	print gen_complete_msg
 
 	;init mouse
 	mov ax,0
@@ -1293,25 +1286,6 @@ start:
 	mov ax,1
 	int 33h
 
-	;debug code to uncover all cells
-	;--------------------------------
-	xor ah,ah
-	mov al,rows
-	dec al
-	xor bh,bh
-loop_r:
-	mov bl,cols
-	dec bl
-	loop_c:
-		;show_cell_caller ax,bx
-		dec bl
-		cmp bl,0ffh
-		jne loop_c
-	dec al
-	cmp al,0ffh
-	jne loop_r
-	;--------------------------------
-	
 	mov bx,0
 	;di represents mouse buttons status flag (1 when mouse button is down,0 when mouse button is up)
 	mov di,0
