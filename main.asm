@@ -63,7 +63,7 @@ CLOSED_CELL_BACKGROUND_COLOR equ 8
 OPENED_CELL_BACKGROUND_COLOR equ 0
 
 invalid_input_msg db 'Invalid Entry!',10,13,'$'
-choose_type_msg db 'Choose Game Type:',10,13,'1) Easy',10,13,'2) Medium',10,13,'3) Hard',10,13,'$'
+choose_type_msg db 'Choose Game Type:',10,13,'1) Easy (9x9 grid with 10 bombs)',10,13,'2) Medium (16x16 grid with 30 bombs)',10,13,'3) Hard (16x16 grid with 40 bombs)',10,13,'$'
 
 .CODE
 
@@ -1228,6 +1228,10 @@ PROMPT:
 	je type_1
 	cmp al,2
 	je type_2
+
+	; clear the display
+	mov ax,03h
+	int 10h	
 	
 	mov dh,18 ;set row
 	mov dl,0 ;set col
